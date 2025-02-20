@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: 'postgres:latest'
+    container_name: postgres  # コンテナ名を指定
+    environment:
+      - POSTGRES_DB=book-management-db
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_USER=postgres
+    ports:
+      - '5432:5432'
+    volumes: # マイグレーションSQLファイルをマウントして、Flywayに実行させる
+      - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d
+
+  flyway:
+    image: flyway/flyway:latest
+    container_name: flyway  # コンテナ名を指定
+    environment:
+      - FLYWAY_URL=jdbc:postgresql://postgres:5432/book-management-db
+      - FLYWAY_USER=postgres
+      - FLYWAY_PASSWORD=pass
+      - FLYWAY_SCHEMAS=public
+      - FLYWAY_BASELINE_ON_MIGRATE=true
+    depends_on:
+      - postgres
+    volumes:
+      - ./src/main/resources/db/migration:/flyway/sql
+    command: migrate
+
+  jooq:
+    image: openjdk:21
+    depends_on:
+      - flyway
+    container_name: jooq  # コンテナ名を指定
+    command: >
+      bash -c "
+        echo 'Waiting for Flyway to complete...';
+                until curl --silent --fail http://flyway:8080/health; do sleep 5; done;
+                echo 'Flyway completed, starting jOOQ generation...';
+                ./gradlew generateJooq
+              "
+    volumes:
+      - .:/workspace
+    working_dir: /workspace

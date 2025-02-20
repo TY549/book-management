@@ -1,0 +1,102 @@
+plugins {
+	id 'org.jetbrains.kotlin.jvm' version '1.9.25'
+	id 'org.jetbrains.kotlin.plugin.spring' version '1.9.25'
+	id 'org.springframework.boot' version '3.4.2'
+	id 'io.spring.dependency-management' version '1.1.7'
+
+	id 'org.jooq.jooq-codegen-gradle' version '3.19.18' // jooqプラグイン
+	id 'org.flywaydb.flyway' version '9.16.0'  // Flywayプラグイン
+	id 'java'  // Javaプラグイン
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+
+	// jooq関連
+	implementation 'org.jooq:jooq:3.19.18'
+	implementation 'org.jooq:jooq-meta:3.19.18'
+	implementation 'org.jooq:jooq-codegen:3.19.18'
+	jooqCodegen 'org.postgresql:postgresql:42.7.2'  // jooqCodegenタスク用にJDBCドライバを追加
+
+	// Flyway
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+
+	// PostgreSQL JDBC ドライバの追加
+	implementation 'org.postgresql:postgresql:42.7.2'
+
+	// Kotlin
+	implementation 'org.jetbrains.kotlin:kotlin-reflect'
+	implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
+
+	// Test dependencies
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.9.0'
+}
+
+kotlin {
+	compilerOptions {
+		freeCompilerArgs.addAll '-Xjsr305=strict'
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+// jooqの設定追加
+jooq {
+	version = '3.19.18'
+
+	configuration {
+		jdbc {
+			driver = 'org.postgresql.Driver'
+			url = 'jdbc:postgresql://localhost:5432/book-management-db'
+			user = 'postgres'
+			password = 'pass'
+		}
+		generator {
+			database {
+				name = 'org.jooq.meta.postgres.PostgresDatabase'
+				inputSchema = 'public'
+				includes = ".*"
+			}
+			generate {
+				relations = true
+				records = true
+				pojos = true
+			}
+			target {
+				directory = 'src/main/java'
+				packageName = 'com.example.generated'
+			}
+		}
+	}
+}
+
+flyway {
+	// Flyway設定
+	url = 'jdbc:postgresql://localhost:5432/book-management-db'
+	user = 'postgres'
+	password = 'pass'
+	schemas = ['public']
+	locations = ['filesystem:./src/main/resources/db/migration']
+	baselineOnMigrate = true  // 履歴テーブルがない場合に自動で作成
+	cleanDisabled = false
+}
